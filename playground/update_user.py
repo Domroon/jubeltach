@@ -1,4 +1,4 @@
-from connect import config
+from playground.connect import config
 
 import psycopg2
 

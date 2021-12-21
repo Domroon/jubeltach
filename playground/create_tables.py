@@ -1,4 +1,4 @@
-from connect import config
+from playground.connect import config
 
 import psycopg2
 
@@ -19,7 +19,9 @@ def create_tables():
         CREATE TABLE songs (
             song_id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
-            interpreter VARCHAR(255) NOT NULL
+            interpreter VARCHAR(255) NOT NULL,
+            leadsheet VARCHAR(255),
+            music VARCHAR(255)
         )
         """,
         """
