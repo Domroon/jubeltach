@@ -2,14 +2,20 @@ from configparser import ConfigParser
 from typing import List
 import json
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
+import psycopg2
+from psycopg2.errors import UniqueViolation
 from pydantic import BaseModel
 from pydantic.fields import Field
 from sqlalchemy import text
 from sqlalchemy import engine_from_config
+import sqlalchemy
 
 from playground.create_tables import create_tables
+
+
+MAX_VOTES_PER_USER = 3
 
 
 def get_config(filename="database.ini", section="test"):
@@ -40,6 +46,11 @@ class Song(BaseModel):
     interpreter: str
     leadsheet: str
     music: str
+
+
+class Vote(BaseModel):
+    user_id: int
+    song_id: int
 
 
 @app.post("/users/")
@@ -118,8 +129,58 @@ async def get_all_songs():
         return list(connection.execute(text(sql)))
 
 
-# add vote_for_songname /vote/{user_id}/
+@app.post("/votes/")
+async def create_votes_table():
+    with engine.connect() as connection:
+        sql = text("""
+        CREATE TABLE IF NOT EXISTS votes(
+            user_id INTEGER NOT NULL,
+            song_id INTEGER NOT NULL,
+            PRIMARY KEY (user_id, song_id),
+            FOREIGN KEY (user_id)
+                REFERENCES users (user_id)
+                ON UPDATE CASCADE ON DELETE CASCADE,
+            FOREIGN KEY (song_id)
+                REFERENCES songs (song_id)
+                ON UPDATE CASCADE ON DELETE CASCADE
+        )
+        """)
+        connection.execute(sql)
+
+        votes = text("SELECT * FROM votes;")
+
+        return votes
+
+
+@app.post("/vote/{user_id}/{song_id}")
+async def vote_for_song_id(user_id: int, song_id: int):
+    get_vote_qty = text("""
+        SELECT vote_qty FROM users WHERE user_id=:user_id""")
+
+    insert_vote = text("""
+        INSERT INTO votes (user_id, song_id)
+        VALUES (:user_id, :song_id)""")
+
+    with engine.connect() as connection:
+        vote_qty_list = connection.execute(get_vote_qty, {"user_id": user_id})
+        vote_qty_dict = list(vote_qty_list)[0]
+        if vote_qty_dict["vote_qty"] == MAX_VOTES_PER_USER:
+            raise HTTPException(status_code=403, detail="The user has reached the maximum number of votes")
+
+        try:
+            connection.execute(insert_vote, {"user_id": user_id, "song_id": song_id})
+        except sqlalchemy.exc.IntegrityError:
+            raise HTTPException(status_code=403, detail="The user can only select the same song once")
+
+        show_vote = text("""
+        SELECT * FROM votes WHERE user_id=:user_id AND song_id=:song_id;
+        """)
+        vote = connection.execute(show_vote, {"user_id": user_id, "song_id": song_id})
+
+    return list(vote)[0]
+
+
+# add vote_for_songname /vote/{user_id}/{song_id}
 # - add a function that increase vote_qty from the person who have vote
-# when the person vote valid (valid: not vote the same song twice)
-#  - add song_id and user_id in the same column
-# - if this column exists it is not valid!
+
+# - add a link that shows a table with the songs and how much they are voted
