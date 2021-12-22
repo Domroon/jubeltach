@@ -111,7 +111,11 @@ async def create_song_list(song_list: List[Song]):
     return song_list
 
 
-
+@app.get("/songs/")
+async def get_all_songs():
+    with engine.connect() as connection:
+        sql = "SELECT * FROM songs ORDER BY song_id;"
+        return list(connection.execute(text(sql)))
 
 
 # add vote_for_songname /vote/{user_id}/
