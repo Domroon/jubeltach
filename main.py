@@ -23,23 +23,51 @@ app = FastAPI()
 
 
 class User(BaseModel):
+    name: str
+    password: str
+
+
+class UserOut(BaseModel):
     user_id: int
     name: str
     password: str
     accept_invitation: bool = Field(None)
-    vote_qty: int
+    vote_qty: int = 0
 
 
 class Song(BaseModel):
-    # song_id: int
     title: str
     interpreter: str
     leadsheet: str
     music: str
 
 
+@app.post("/users/")
+async def create_user_list(user_list: List[User]):
+    with engine.connect() as connection:
+        connection.execute("DROP TABLE IF EXISTS users")
+        create_users = """
+        CREATE TABLE users(
+            user_id SERIAL PRIMARY KEY,
+            name VARCHAR(20) NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            accept_invitation BOOLEAN,
+            vote_qty SMALLINT DEFAULT 0 NOT NULL
+        )
+        """
+        connection.execute(create_users)
+
+        insert_user = text("""
+            INSERT INTO users (name, password)
+            VALUES (:name, :password)""")
+        for user in user_list:
+            connection.execute(insert_user, {"name": user.name, "password": user.password})
+
+    return user_list
+
+
 @app.get(
-    "/users/", response_model=List[User], response_model_exclude={"password"}
+    "/users/", response_model=List[UserOut], response_model_exclude={"password"}
 )
 async def get_all_users():
     with engine.connect() as connection:
@@ -47,7 +75,7 @@ async def get_all_users():
         return list(connection.execute(text(sql)))
 
 
-@app.patch("/user/invitation_status/{user_id}", response_model=List[User], response_model_exclude={"password"})
+@app.patch("/user/status/{user_id}", response_model=List[UserOut], response_model_exclude={"password"})
 async def change_invitation_status(user_id: int, answer: bool = None):
     with engine.connect() as connection:
         sql = text("UPDATE users SET accept_invitation=:status WHERE user_id=:id;")
@@ -84,7 +112,6 @@ async def create_song_list(song_list: List[Song]):
 
 
 
-# add add_songlist songs/
 
 
 # add vote_for_songname /vote/{user_id}/
