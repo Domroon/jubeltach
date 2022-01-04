@@ -161,6 +161,10 @@ async def vote_for_song_id(user_id: int, song_id: int):
         INSERT INTO votes (user_id, song_id)
         VALUES (:user_id, :song_id)""")
 
+    increase_vote_qty = text("""
+        UPDATE users SET vote_qty=:vote_qty WHERE user_id=:user_id;
+        """)
+
     with engine.connect() as connection:
         vote_qty_list = connection.execute(get_vote_qty, {"user_id": user_id})
         vote_qty_dict = list(vote_qty_list)[0]
@@ -169,6 +173,8 @@ async def vote_for_song_id(user_id: int, song_id: int):
 
         try:
             connection.execute(insert_vote, {"user_id": user_id, "song_id": song_id})
+            new_vote_qty = vote_qty_dict["vote_qty"] + 1
+            connection.execute(increase_vote_qty, {"vote_qty": new_vote_qty, "user_id": user_id})
         except sqlalchemy.exc.IntegrityError:
             raise HTTPException(status_code=403, detail="The user can only select the same song once")
 
@@ -184,3 +190,11 @@ async def vote_for_song_id(user_id: int, song_id: int):
 # - add a function that increase vote_qty from the person who have vote
 
 # - add a link that shows a table with the songs and how much they are voted
+
+# - add songlist delete
+
+# - add userlist delete
+
+# -add user delete
+
+# - add song delete
