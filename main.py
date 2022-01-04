@@ -185,9 +185,23 @@ async def vote_for_song_id(user_id: int, song_id: int):
 
     return list(vote)[0]
 
+@app.get("/votes")
+async def get_all_votes():
+    with engine.connect() as connection:
+        get_all_votes = """
+        SELECT s.song_id, s.title, s.interpreter, COUNT(v.song_id)
+        FROM votes as v, songs as s
+        WHERE s.song_id=v.song_id
+        GROUP BY s.song_id, v.song_id, s.title, s.interpreter
+        ORDER BY COUNT(v.song_id) DESC;
+        """
+    
+        votes = connection.execute(get_all_votes)
+
+    return list(votes)
+
 
 # add vote_for_songname /vote/{user_id}/{song_id}
-# - add a function that increase vote_qty from the person who have vote
 
 # - add a link that shows a table with the songs and how much they are voted
 
@@ -198,3 +212,5 @@ async def vote_for_song_id(user_id: int, song_id: int):
 # -add user delete
 
 # - add song delete
+
+# - add oauth2 security
