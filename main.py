@@ -1,10 +1,9 @@
 from configparser import ConfigParser
 from typing import List
-import json
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.encoders import jsonable_encoder
-import psycopg2
 from psycopg2.errors import UniqueViolation
 from pydantic import BaseModel
 from pydantic.fields import Field
@@ -26,6 +25,8 @@ def get_config(filename="database.ini", section="test"):
 
 engine = engine_from_config(get_config(), prefix='sqlalchemy.')
 app = FastAPI()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="test-token")
 
 
 class User(BaseModel):
@@ -201,16 +202,25 @@ async def get_all_votes():
     return list(votes)
 
 
-# add vote_for_songname /vote/{user_id}/{song_id}
+@app.get("/test-token")
+async def get_test_token(token: str = Depends(oauth2_scheme)):
+    return {"token": token}
+
+
+# -> add oauth2 security
 
 # - add a link that shows a table with the songs and how much they are voted
 
+# - add song change
 # - add songlist delete
 
 # - add userlist delete
 
-# -add user delete
+# - add user change
+# - add user delete
 
+# - add song change
 # - add song delete
 
-# - add oauth2 security
+# - add voteliste delete
+
