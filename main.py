@@ -3,8 +3,7 @@ from typing import List
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.encoders import jsonable_encoder
-from psycopg2.errors import UniqueViolation
+from passlib.context import CryptContext
 from pydantic import BaseModel
 from pydantic.fields import Field
 from sqlalchemy import text
@@ -13,7 +12,9 @@ import sqlalchemy
 
 from playground.create_tables import create_tables
 
-
+SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1
 MAX_VOTES_PER_USER = 3
 
 
@@ -26,6 +27,7 @@ def get_config(filename="database.ini", section="test"):
 engine = engine_from_config(get_config(), prefix='sqlalchemy.')
 app = FastAPI()
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="test-token")
 
 
@@ -54,6 +56,10 @@ class Vote(BaseModel):
     song_id: int
 
 
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+
 @app.post("/users/")
 async def create_user_list(user_list: List[User]):
     with engine.connect() as connection:
@@ -73,6 +79,8 @@ async def create_user_list(user_list: List[User]):
             INSERT INTO users (name, password)
             VALUES (:name, :password)""")
         for user in user_list:
+            hashed_password = get_password_hash(user.password)
+            user.password = hashed_password
             connection.execute(insert_user, {"name": user.name, "password": user.password})
 
     return user_list
