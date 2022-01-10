@@ -1,8 +1,8 @@
 from configparser import ConfigParser
 from typing import List
 
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from pydantic.fields import Field
@@ -28,7 +28,7 @@ engine = engine_from_config(get_config(), prefix='sqlalchemy.')
 app = FastAPI()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="test-token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 class User(BaseModel):
@@ -56,8 +56,31 @@ class Vote(BaseModel):
     song_id: int
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
 def get_password_hash(password):
     return pwd_context.hash(password)
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def authenticate_user(username: str, password: str):
+    get_user = text("""
+    SELECT name, password FROM users WHERE name=:name
+    """)
+    with engine.connect() as connection:
+        user = list(connection.execute(get_user, {"name": username}))
+        user = user[0]
+    if not user:
+        return False
+    if not verify_password(password, user["password"]):
+        return False
+    return user
 
 
 @app.post("/users/")
@@ -210,9 +233,16 @@ async def get_all_votes():
     return list(votes)
 
 
-@app.get("/test-token")
-async def get_test_token(token: str = Depends(oauth2_scheme)):
-    return {"token": token}
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {"access_token": "test", "token_type": "bearer"}
 
 
 # -> add oauth2 security
