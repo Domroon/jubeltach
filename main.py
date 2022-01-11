@@ -16,7 +16,7 @@ from playground.create_tables import create_tables
 
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1
+ACCESS_TOKEN_EXPIRE_MINUTES = 100
 MAX_VOTES_PER_USER = 3
 ADMIN = "Domroon"
 SUPERUSER = "Andreas"
@@ -316,14 +316,23 @@ async def get_current_user(current_user: User = Depends(read_current_user)):
 
 
 @app.get("/users/votes")
-async def get_all_votes(current_user: User = Depends(read_current_user)):
+async def get_current_users_votes(current_user: User = Depends(read_current_user)):
     with engine.connect() as connection:
-        get_users_votes = """
+        get_users_votes = text("""
         SELECT song_id FROM votes WHERE user_id=:user_id
-        """
+        """)
+        get_song = text("""
+        SELECT song_id, title, interpreter FROM songs WHERE song_id=:song_id
+        """)
         votes = connection.execute(get_users_votes, {"user_id": current_user["user_id"]})
-
-    return list(votes)
+        song_id_list = []
+        for vote in votes:
+            song_id_list.append(vote["song_id"])
+        songs = []
+        for song_id in song_id_list:
+            song = list(connection.execute(get_song, {"song_id": song_id}))
+            songs.append(song[0])
+    return songs
 
 
 # -> add oauth2 security
