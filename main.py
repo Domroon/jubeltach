@@ -16,7 +16,7 @@ from playground.create_tables import create_tables
 
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 100
+ACCESS_TOKEN_EXPIRE_MINUTES = 1
 MAX_VOTES_PER_USER = 3
 ADMIN = "Domroon"
 SUPERUSER = "Andreas"
@@ -178,20 +178,19 @@ async def get_all_users(current_user: User = Depends(read_current_user)):
         return list(connection.execute(text(sql)))
 
 
-@app.patch("/user/status/{user_id}", response_model=List[UserOut], response_model_exclude={"password"})
-async def change_invitation_status(user_id: int, answer: bool = None):
+@app.patch("/user/status", response_model=List[UserOut], response_model_exclude={"password"})
+async def change_invitation_status(current_user: User = Depends(read_current_user), answer: bool = None):
     with engine.connect() as connection:
-        sql = text("UPDATE users SET accept_invitation=:status WHERE user_id=:id;")
-        connection.execute(sql, {"status": answer, "id": user_id})
-        sql2 = text("SELECT * FROM users WHERE user_id=:id;")
-        user = connection.execute(sql2, {"id": user_id})
-        return list(user)
+        update_user = text("UPDATE users SET accept_invitation=:status WHERE user_id=:id;")
+        get_user = text("SELECT * FROM users WHERE user_id=:id;")
+        connection.execute(update_user, {"status": answer, "id": current_user["user_id"]})
+        changed_user = connection.execute(get_user, {"id": current_user["user_id"]})
+        return list(changed_user)
 
 
 @app.post("/songs/")
-async def create_song_list(song_list: List[Song]):
-    # song_list_dict = jsonable_encoder(song_list)
-    # return song_list_dict
+async def create_song_list(song_list: List[Song], current_user: User = Depends(read_current_user)):
+    check_user_scope(current_user["name"], [ADMIN])
     with engine.connect() as connection:
         connection.execute("DROP TABLE IF EXISTS songs")
         create_songs = """
@@ -215,14 +214,15 @@ async def create_song_list(song_list: List[Song]):
 
 
 @app.get("/songs/")
-async def get_all_songs():
+async def get_all_songs(current_user: User = Depends(read_current_user)):
     with engine.connect() as connection:
         sql = "SELECT * FROM songs ORDER BY song_id;"
         return list(connection.execute(text(sql)))
 
 
 @app.post("/votes/")
-async def create_votes_table():
+async def create_votes_table(current_user: User = Depends(read_current_user)):
+    check_user_scope(current_user["name"], [ADMIN])
     with engine.connect() as connection:
         sql = text("""
         CREATE TABLE IF NOT EXISTS votes(
@@ -244,8 +244,8 @@ async def create_votes_table():
         return votes
 
 
-@app.post("/vote/{user_id}/{song_id}")
-async def vote_for_song_id(user_id: int, song_id: int):
+@app.post("/vote/{song_id}")
+async def vote_for_song_id(song_id: int, current_user: User = Depends(read_current_user)):
     get_vote_qty = text("""
         SELECT vote_qty FROM users WHERE user_id=:user_id""")
 
@@ -258,27 +258,28 @@ async def vote_for_song_id(user_id: int, song_id: int):
         """)
 
     with engine.connect() as connection:
-        vote_qty_list = connection.execute(get_vote_qty, {"user_id": user_id})
+        vote_qty_list = connection.execute(get_vote_qty, {"user_id": current_user["user_id"]})
         vote_qty_dict = list(vote_qty_list)[0]
         if vote_qty_dict["vote_qty"] == MAX_VOTES_PER_USER:
             raise HTTPException(status_code=403, detail="The user has reached the maximum number of votes")
 
         try:
-            connection.execute(insert_vote, {"user_id": user_id, "song_id": song_id})
+            connection.execute(insert_vote, {"user_id": current_user["user_id"], "song_id": song_id})
             new_vote_qty = vote_qty_dict["vote_qty"] + 1
-            connection.execute(increase_vote_qty, {"vote_qty": new_vote_qty, "user_id": user_id})
+            connection.execute(increase_vote_qty, {"vote_qty": new_vote_qty, "user_id": current_user["user_id"]})
         except sqlalchemy.exc.IntegrityError:
             raise HTTPException(status_code=403, detail="The user can only select the same song once")
 
         show_vote = text("""
         SELECT * FROM votes WHERE user_id=:user_id AND song_id=:song_id;
         """)
-        vote = connection.execute(show_vote, {"user_id": user_id, "song_id": song_id})
+        vote = connection.execute(show_vote, {"user_id": current_user["user_id"], "song_id": song_id})
 
     return list(vote)[0]
 
 @app.get("/votes")
-async def get_all_votes():
+async def get_all_votes(current_user: User = Depends(read_current_user)):
+    check_user_scope(current_user["name"], [ADMIN, SUPERUSER])
     with engine.connect() as connection:
         get_all_votes = """
         SELECT s.song_id, s.title, s.interpreter, COUNT(v.song_id)
@@ -314,7 +315,20 @@ async def get_current_user(current_user: User = Depends(read_current_user)):
     return current_user
 
 
+@app.get("/users/votes")
+async def get_all_votes(current_user: User = Depends(read_current_user)):
+    with engine.connect() as connection:
+        get_users_votes = """
+        SELECT song_id FROM votes WHERE user_id=:user_id
+        """
+        votes = connection.execute(get_users_votes, {"user_id": current_user["user_id"]})
+
+    return list(votes)
+
+
 # -> add oauth2 security
+
+# -> add https
 
 # - add a link that shows a table with the songs and how much they are voted
 
