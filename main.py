@@ -16,7 +16,7 @@ from playground.create_tables import create_tables
 
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1
+ACCESS_TOKEN_EXPIRE_MINUTES = 100
 MAX_VOTES_PER_USER = 3
 
 
@@ -63,6 +63,10 @@ class Token(BaseModel):
     token_type: str
 
 
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
+
+
 def get_password_hash(password):
     return pwd_context.hash(password)
 
@@ -94,6 +98,35 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def read_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credential (JWR Error)",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    credentials_exception_id = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials (No user_id)",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception_id
+        token_data = TokenData(user_id=user_id)
+    except JWTError as error:
+        raise credentials_exception
+
+    get_user = text("""
+    SELECT * FROM users WHERE user_id=:user_id
+    """)
+    with engine.connect() as connection:
+        user_list = list(connection.execute(get_user, {"user_id": token_data.user_id}))
+    user = user_list[0]
+    return user
 
 
 @app.post("/users/")
@@ -257,9 +290,14 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.user_id}, expires_delta=access_token_expires
+        data={"sub": str(user["user_id"])}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/users/current", response_model=UserOut, response_model_exclude={"password"})
+async def get_current_user(current_user: User = Depends(read_current_user)):
+    return current_user
 
 
 # -> add oauth2 security
