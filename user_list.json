@@ -1,22 +1,22 @@
 [
   {
     "name": "Frodo",
-    "password": "test123"
+    "password": "Frodo"
   },
   {
     "name": "Domroon",
-    "password": "EsPwfAWs11012022"
+    "password": "Domroon"
   },
   {
     "name": "Andre",
-    "password": "geheim"
+    "password": "Andre"
   },
   {
     "name": "Abraham",
-    "password": "geheimesPassword"
+    "password": "Abraham"
   },
   {
     "name": "Andreas",
-    "password": "!andreas@JUBELTACH11012022!"
+    "password": "Andreas"
   }
 ]
