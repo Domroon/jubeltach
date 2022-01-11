@@ -18,6 +18,8 @@ SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 100
 MAX_VOTES_PER_USER = 3
+ADMIN = "Domroon"
+SUPERUSER = "Andreas"
 
 
 def get_config(filename="database.ini", section="test"):
@@ -81,9 +83,9 @@ def authenticate_user(username: str, password: str):
     """)
     with engine.connect() as connection:
         user = list(connection.execute(get_user, {"name": username}))
-        user = user[0]
     if not user:
         return False
+    user = user[0]
     if not verify_password(password, user["password"]):
         return False
     return user
@@ -129,8 +131,19 @@ def read_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
+def check_user_scope(username: str, usernames: list, ):
+    permission_exception = HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Not enough permissions",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if username not in usernames:
+        raise permission_exception
+
+
 @app.post("/users/")
-async def create_user_list(user_list: List[User]):
+async def create_user_list(user_list: List[User], current_user: User = Depends(read_current_user)):
+    check_user_scope(current_user["name"], [ADMIN])
     with engine.connect() as connection:
         connection.execute("DROP TABLE IF EXISTS users")
         create_users = """
@@ -158,7 +171,8 @@ async def create_user_list(user_list: List[User]):
 @app.get(
     "/users/", response_model=List[UserOut], response_model_exclude={"password"}
 )
-async def get_all_users():
+async def get_all_users(current_user: User = Depends(read_current_user)):
+    check_user_scope(current_user["name"], [ADMIN, SUPERUSER])
     with engine.connect() as connection:
         sql = "SELECT * FROM users ORDER BY user_id;"
         return list(connection.execute(text(sql)))
