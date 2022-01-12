@@ -11,6 +11,7 @@ from sqlalchemy import text
 from sqlalchemy import engine_from_config
 import sqlalchemy
 from jose import JWTError, jwt
+from fastapi.middleware.cors import CORSMiddleware
 
 from playground.create_tables import create_tables
 
@@ -20,7 +21,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 100
 MAX_VOTES_PER_USER = 3
 ADMIN = "Domroon"
 SUPERUSER = "Andreas"
-
+ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8000/token",
+    "http://localhost:8000",
+    "http://localhost"
+]
 
 def get_config(filename="database.ini", section="test"):
     parser = ConfigParser()
@@ -30,6 +36,15 @@ def get_config(filename="database.ini", section="test"):
 
 engine = engine_from_config(get_config(), prefix='sqlalchemy.')
 app = FastAPI()
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
