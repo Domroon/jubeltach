@@ -18,14 +18,17 @@ from playground.create_tables import create_tables
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 100
-MAX_VOTES_PER_USER = 3
+MAX_VOTES_PER_USER = 45
 ADMIN = "Domroon"
 SUPERUSER = "Andreas"
 ORIGINS = [
     "http://127.0.0.1:8000",
     "http://127.0.0.1:8000/token",
     "http://localhost:8000",
-    "http://localhost"
+    "http://localhost",
+    "https://299a217.online-server.cloud",
+    "https://299a217.online-server.cloud/",
+    "https://299a217.online-server.cloud/token"
 ]
 
 def get_config(filename="database.ini", section="test"):
@@ -275,7 +278,7 @@ async def vote_for_song_id(song_id: int, current_user: User = Depends(read_curre
     with engine.connect() as connection:
         vote_qty_list = connection.execute(get_vote_qty, {"user_id": current_user["user_id"]})
         vote_qty_dict = list(vote_qty_list)[0]
-        if vote_qty_dict["vote_qty"] == MAX_VOTES_PER_USER:
+        if vote_qty_dict["vote_qty"] >= MAX_VOTES_PER_USER:
             raise HTTPException(status_code=403, detail="The user has reached the maximum number of votes")
 
         try:
