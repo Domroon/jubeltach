@@ -167,7 +167,7 @@ async def create_user_list(user_list: List[User], current_user: User = Depends(r
         create_users = """
         CREATE TABLE users(
             user_id SERIAL PRIMARY KEY,
-            name VARCHAR(20) NOT NULL,
+            name VARCHAR(20) NOT NULL UNIQUE,
             password VARCHAR(255) NOT NULL,
             accept_invitation BOOLEAN,
             vote_qty SMALLINT DEFAULT 0 NOT NULL
