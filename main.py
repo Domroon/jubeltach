@@ -18,14 +18,17 @@ from playground.create_tables import create_tables
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 100
-MAX_VOTES_PER_USER = 3
-ADMIN = "Domroon"
+MAX_VOTES_PER_USER = 45
+ADMIN = "Piano"
 SUPERUSER = "Andreas"
 ORIGINS = [
     "http://127.0.0.1:8000",
     "http://127.0.0.1:8000/token",
     "http://localhost:8000",
-    "http://localhost"
+    "http://localhost",
+    "https://299a217.online-server.cloud",
+    "https://299a217.online-server.cloud/",
+    "https://299a217.online-server.cloud/token"
 ]
 
 def get_config(filename="database.ini", section="test"):
@@ -164,7 +167,7 @@ async def create_user_list(user_list: List[User], current_user: User = Depends(r
         create_users = """
         CREATE TABLE users(
             user_id SERIAL PRIMARY KEY,
-            name VARCHAR(20) NOT NULL,
+            name VARCHAR(20) NOT NULL UNIQUE,
             password VARCHAR(255) NOT NULL,
             accept_invitation BOOLEAN,
             vote_qty SMALLINT DEFAULT 0 NOT NULL
