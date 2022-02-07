@@ -278,7 +278,7 @@ async def vote_for_song_id(song_id: int, current_user: User = Depends(read_curre
     with engine.connect() as connection:
         vote_qty_list = connection.execute(get_vote_qty, {"user_id": current_user["user_id"]})
         vote_qty_dict = list(vote_qty_list)[0]
-        if vote_qty_dict["vote_qty"] == MAX_VOTES_PER_USER:
+        if vote_qty_dict["vote_qty"] >= MAX_VOTES_PER_USER:
             raise HTTPException(status_code=403, detail="The user has reached the maximum number of votes")
 
         try:
