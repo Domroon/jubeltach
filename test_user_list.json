@@ -1,0 +1,32 @@
+[
+  {
+    "login_name": "Frodo",
+    "user_name": "test1",
+    "password": "Frodo"
+  },
+  {
+    "login_name": "Domroon",
+    "user_name": "test2",
+    "password": "Domroon"
+  },
+  {
+    "login_name": "Piano",
+    "user_name": "test42",
+    "password": "Piano"
+  },
+  {
+    "login_name": "Andre",
+    "user_name": "test3",
+    "password": "Andre"
+  },
+  {
+    "login_name": "Abraham",
+    "user_name": "test4",
+    "password": "Abraham"
+  },
+  {
+    "login_name": "Andreas",
+    "user_name": "test5",
+    "password": "Andreas"
+  }
+]
