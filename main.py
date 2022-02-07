@@ -54,13 +54,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 class User(BaseModel):
-    name: str
+    login_name: str
+    user_name: str
     password: str
 
 
 class UserOut(BaseModel):
     user_id: int
-    name: str
+    login_name: str
+    user_name: str
     password: str
     accept_invitation: bool = Field(None)
     vote_qty: int = 0
@@ -97,7 +99,7 @@ def verify_password(plain_password, hashed_password):
 
 def authenticate_user(username: str, password: str):
     get_user = text("""
-    SELECT user_id, name, password FROM users WHERE name=:name
+    SELECT user_id, login_name, password FROM users WHERE login_name=:name
     """)
     with engine.connect() as connection:
         user = list(connection.execute(get_user, {"name": username}))
@@ -149,25 +151,26 @@ def read_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 
-def check_user_scope(username: str, usernames: list, ):
+def check_user_scope(login_name: str, login_names: list, ):
     permission_exception = HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Not enough permissions",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    if username not in usernames:
+    if login_name not in login_names:
         raise permission_exception
 
 
 @app.post("/users/")
 async def create_user_list(user_list: List[User], current_user: User = Depends(read_current_user)):
-    check_user_scope(current_user["name"], [ADMIN])
+    check_user_scope(current_user["login_name"], [ADMIN])
     with engine.connect() as connection:
         connection.execute("DROP TABLE IF EXISTS users")
         create_users = """
         CREATE TABLE users(
             user_id SERIAL PRIMARY KEY,
-            name VARCHAR(20) NOT NULL UNIQUE,
+            login_name VARCHAR(20) NOT NULL UNIQUE,
+            user_name VARCHAR(20) NOT NULL,
             password VARCHAR(255) NOT NULL,
             accept_invitation BOOLEAN,
             vote_qty SMALLINT DEFAULT 0 NOT NULL
@@ -176,12 +179,12 @@ async def create_user_list(user_list: List[User], current_user: User = Depends(r
         connection.execute(create_users)
 
         insert_user = text("""
-            INSERT INTO users (name, password)
-            VALUES (:name, :password)""")
+            INSERT INTO users (login_name, user_name, password)
+            VALUES (:login_name, :user_name, :password)""")
         for user in user_list:
             hashed_password = get_password_hash(user.password)
             user.password = hashed_password
-            connection.execute(insert_user, {"name": user.name, "password": user.password})
+            connection.execute(insert_user, {"login_name": user.login_name, "user_name": user.user_name, "password": user.password})
 
     return user_list
 
@@ -190,7 +193,7 @@ async def create_user_list(user_list: List[User], current_user: User = Depends(r
     "/users/", response_model=List[UserOut], response_model_exclude={"password"}
 )
 async def get_all_users(current_user: User = Depends(read_current_user)):
-    check_user_scope(current_user["name"], [ADMIN, SUPERUSER])
+    check_user_scope(current_user["login_name"], [ADMIN, SUPERUSER])
     with engine.connect() as connection:
         sql = "SELECT * FROM users ORDER BY user_id;"
         return list(connection.execute(text(sql)))
@@ -208,7 +211,7 @@ async def change_invitation_status(current_user: User = Depends(read_current_use
 
 @app.post("/songs/")
 async def create_song_list(song_list: List[Song], current_user: User = Depends(read_current_user)):
-    check_user_scope(current_user["name"], [ADMIN])
+    check_user_scope(current_user["login_name"], [ADMIN])
     with engine.connect() as connection:
         connection.execute("DROP TABLE IF EXISTS songs")
         create_songs = """
@@ -240,7 +243,7 @@ async def get_all_songs(current_user: User = Depends(read_current_user)):
 
 @app.post("/votes/")
 async def create_votes_table(current_user: User = Depends(read_current_user)):
-    check_user_scope(current_user["name"], [ADMIN])
+    check_user_scope(current_user["login_name"], [ADMIN])
     with engine.connect() as connection:
         sql = text("""
         CREATE TABLE IF NOT EXISTS votes(
@@ -297,7 +300,7 @@ async def vote_for_song_id(song_id: int, current_user: User = Depends(read_curre
 
 @app.get("/votes")
 async def get_all_votes(current_user: User = Depends(read_current_user)):
-    check_user_scope(current_user["name"], [ADMIN, SUPERUSER])
+    check_user_scope(current_user["login_name"], [ADMIN, SUPERUSER])
     with engine.connect() as connection:
         get_all_votes = """
         SELECT s.song_id, s.title, s.interpreter, COUNT(v.song_id)
