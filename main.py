@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from playground.create_tables import create_tables
 
+__version__ = "1.0.0"
 SECRET_KEY = "6c7161d209dc4182936cfe756ab7ee32c04b6cd4cb8f6925f73a88fe0762f2f1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 100
